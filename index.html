@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>在线客服</title>
+<script>
+// ===== 白名单：只允许 https，且必须是下列主域或其子域名 =====
+// ffuf.cn  → weixin.ffuf.cn / qq.ffuf.cn ...
+// ak03.cn  → xuan.ak03.cn ...
+var ALLOW_HOSTS = ['ffuf.cn', 'ak03.cn'];
+function hostAllowed(host){
+  host = String(host || '').toLowerCase();
+  for (var i = 0; i < ALLOW_HOSTS.length; i++) {
+    var d = ALLOW_HOSTS[i];
+    if (host === d || host.slice(-(d.length + 1)) === '.' + d) return true;
+  }
+  return false;
+}
+
+(function(){
+  'use strict';
+
+  // ===== 防复制（提高门槛，非绝对）=====
+  document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+  document.addEventListener('keydown', function(e){
+    var k = (e.key || '').toUpperCase();
+    if (k === 'F12') { e.preventDefault(); return false; }
+    if (e.ctrlKey && e.shiftKey && (k === 'I' || k === 'J' || k === 'C')) { e.preventDefault(); return false; }
+    if (e.ctrlKey && (k === 'U' || k === 'S' || k === 'P')) { e.preventDefault(); return false; }
+  });
+
+  // ===== 解析参数并嵌入站点 =====
+  var q = new URLSearchParams(location.search);
+
+  // 短码写法：
+  //   #278e36    → 小羽（weixin.ffuf.cn）
+  //   #x21c8ef   → xuan.ak03.cn 的客服
+  //   ?a=278e36 / ?a=x21c8ef  同上
+  // 长码写法（兼容旧链接）：?baidu=<整条地址的base64>  或  ?c=<base64>
+  var SITES = {
+    '': 'https://weixin.ffuf.cn/kf.html?agent=',   // 默认：weixin 客服系统
+    'x': 'https://xuan.ak03.cn/kf.html?agent='     // x 开头：xuan 客服系统
+  };
+
+  var code = '';
+  var hash = (location.hash || '').replace(/^#!?/, '').trim();
+  if (/^([a-z0-9]{4,16}|x[a-z0-9]{4,16})$/i.test(hash)) code = hash.toLowerCase();
+  if (!code) {
+    var pa = (q.get('a') || '').trim();
+    if (/^([a-z0-9]{4,16}|x[a-z0-9]{4,16})$/i.test(pa)) code = pa.toLowerCase();
+  }
+
+  var t = '';
+  if (code) {
+    // 短码由壳自己拼目标地址，不再把整条 URL 塞进链接
+    var prefix = code.charAt(0) === 'x' ? 'x' : '';
+    t = SITES[prefix] + code.slice(prefix.length);
+  } else {
+    var c = q.get('baidu') || q.get('c');
+    if (c) {
+      try { t = atob(c.replace(/-/g, '+').replace(/_/g, '/')); } catch (e) { t = c; }
+    }
+  }
+
+  // 白名单校验：只允许 https 且是白名单主域或其子域名（防止别人拿你的壳嵌钓鱼页）
+  var OK = false;
+  try {
+    var u = new URL(t);
+    OK = (u.protocol === 'https:') && hostAllowed(u.hostname);
+  } catch (e) {}
+  if (!OK) {
+    location.replace('https://weixin.qq.com/agreement/weixin_external_links_content_management_specification');
+    return;
+  }
+
+  // 注意：本脚本在 <head> 中执行，此时 body 还不存在，
+  // 必须等 DOMContentLoaded 之后再创建 iframe，否则 appendChild 报错白屏
+  function addIframe() {
+    var f = document.createElement('iframe');
+    f.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;border:0;background:#fff;';
+    f.src = t;
+    document.body.appendChild(f);
+
+    function fixH(){
+      if (f) f.style.height = (window.innerHeight || document.documentElement.clientHeight) + 'px';
+    }
+    window.addEventListener('resize', fixH);
+    window.addEventListener('orientationchange', function(){ setTimeout(fixH, 150); });
+  }
+  if (document.body) {
+    addIframe();
+  } else {
+    window.addEventListener('DOMContentLoaded', addIframe);
+  }
+})();
+
+// ===== 二维码长按识别（只接受白名单主域及子域名发来的消息）=====
+window.addEventListener('message', function (ev) {
+  var evHost = '';
+  try { evHost = new URL(ev.origin).hostname; } catch (e) {}
+  if (!hostAllowed(evHost)) return;
+  if (!ev.data || ev.data.type !== 'showQrImage' || !ev.data.imgUrl) return;
+  var m = document.getElementById('qrModal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'qrModal';
+    m.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:999999;display:none;align-items:center;justify-content:center;cursor:zoom-out;-webkit-user-select:auto;user-select:auto;';
+    m.onclick = function () { m.style.display = 'none'; };
+    m.innerHTML = '<div style="text-align:center;"><img id="qrModalImg" style="max-width:80%;max-height:72%;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.4);display:block;margin:0 auto;" alt="二维码"><div style="color:#fff;font-size:18px;font-weight:600;margin-top:20px;letter-spacing:1px;">长按图片识别二维码</div></div>';
+    document.body.appendChild(m);
+  }
+  var mi = document.getElementById('qrModalImg');
+  if (mi) mi.src = ev.data.imgUrl;
+  m.style.display = 'flex';
+});
+</script>
+</head><body></body>
+</html>
