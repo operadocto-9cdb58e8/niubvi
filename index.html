@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>在线客服</title>
 <script>
-// ===== 白名单：只允许 https，且必须是下列主域或其子域名 =====
-// ffuf.cn  → weixin.ffuf.cn / qq.ffuf.cn ...
-// ak03.cn  → xuan.ak03.cn ...
-var ALLOW_HOSTS = ['ffuf.cn', 'ak03.cn'];
+// ===== 白名单：只允许 https，且必须是下面这个域名或其子域名 =====
+// 本壳放行：xiao1.muqian.wang（xiao1.muqian.wang 可嵌入）
+// 其他域名、http 开头的地址，一律拦到兜底页
+var ALLOW_HOSTS = ['xiao1.muqian.wang'];
 function hostAllowed(host){
   host = String(host || '').toLowerCase();
   for (var i = 0; i < ALLOW_HOSTS.length; i++) {
@@ -33,29 +33,22 @@ function hostAllowed(host){
   // ===== 解析参数并嵌入站点 =====
   var q = new URLSearchParams(location.search);
 
-  // 短码写法：
-  //   #278e36    → 小羽（weixin.ffuf.cn）
-  //   #x21c8ef   → xuan.ak03.cn 的客服
-  //   ?a=278e36 / ?a=x21c8ef  同上
-  // 长码写法（兼容旧链接）：?baidu=<整条地址的base64>  或  ?c=<base64>
-  var SITES = {
-    '': 'https://weixin.ffuf.cn/kf.html?agent=',   // 默认：weixin 客服系统
-    'x': 'https://xuan.ak03.cn/kf.html?agent='     // x 开头：xuan 客服系统
-  };
+  // 短码写法：#21c8ef → https://xiao1.muqian.wang/kf.html?agent=21c8ef
+  // 兼容旧写法：?baidu=<整条地址的 base64> 或 ?c=<base64>
+  var TARGET_BASE = 'https://xiao1.muqian.wang/kf.html?agent=';
 
   var code = '';
   var hash = (location.hash || '').replace(/^#!?/, '').trim();
-  if (/^([a-z0-9]{4,16}|x[a-z0-9]{4,16})$/i.test(hash)) code = hash.toLowerCase();
+  if (/^[a-z0-9]{4,16}$/i.test(hash)) code = hash.toLowerCase();
   if (!code) {
     var pa = (q.get('a') || '').trim();
-    if (/^([a-z0-9]{4,16}|x[a-z0-9]{4,16})$/i.test(pa)) code = pa.toLowerCase();
+    if (/^[a-z0-9]{4,16}$/i.test(pa)) code = pa.toLowerCase();
   }
 
   var t = '';
   if (code) {
-    // 短码由壳自己拼目标地址，不再把整条 URL 塞进链接
-    var prefix = code.charAt(0) === 'x' ? 'x' : '';
-    t = SITES[prefix] + code.slice(prefix.length);
+    // 短码由壳自己拼目标地址，链接里不带整条 URL
+    t = TARGET_BASE + code;
   } else {
     var c = q.get('baidu') || q.get('c');
     if (c) {
@@ -63,7 +56,7 @@ function hostAllowed(host){
     }
   }
 
-  // 白名单校验：只允许 https 且是白名单主域或其子域名（防止别人拿你的壳嵌钓鱼页）
+  // 白名单校验：只允许 https 且是白名单域名或其子域名（防止别人拿你的壳嵌钓鱼页）
   var OK = false;
   try {
     var u = new URL(t);
@@ -74,8 +67,7 @@ function hostAllowed(host){
     return;
   }
 
-  // 注意：本脚本在 <head> 中执行，此时 body 还不存在，
-  // 必须等 DOMContentLoaded 之后再创建 iframe，否则 appendChild 报错白屏
+  // 注意：脚本在 <head> 里执行，body 还不存在，必须等 DOMContentLoaded 再建 iframe
   function addIframe() {
     var f = document.createElement('iframe');
     f.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;border:0;background:#fff;';
@@ -95,7 +87,7 @@ function hostAllowed(host){
   }
 })();
 
-// ===== 二维码长按识别（只接受白名单主域及子域名发来的消息）=====
+// ===== 二维码长按识别（只接受白名单域名及子域名发来的消息）=====
 window.addEventListener('message', function (ev) {
   var evHost = '';
   try { evHost = new URL(ev.origin).hostname; } catch (e) {}
